@@ -55,15 +55,14 @@ The default setting for the ElasticSearch node that is created is as follows:
 
 	
 ### Client Configuration and Bulk Indexing
-
-	A client can connect to ElasticSearch cluster in multiple ways:
-	1. Node Client: When a client runs as 'Node Client', it becomes part of
-	ES cluster(node.local=true)
-	2. Transport Client: When a client runs as 'Transport Client', it connects
-	to ES cluster remotely(node.local=false)
+A client can connect to ElasticSearch cluster in multiple ways:
+1. Node Client: When a client runs as 'Node Client', it becomes part of
+ES cluster(node.local=true)
+2. Transport Client: When a client runs as 'Transport Client', it connects
+to ES cluster remotely(node.local=false)
 	
-	Bulk Indexing allows you to do multiple inserts in a single step. 
-	The following configuration parameters can be used to enabled bulk indexing in ES.
+Bulk Indexing allows you to do multiple inserts in a single step. 
+The following configuration parameters can be used to enabled bulk indexing in ES.
 	
 	bulk.size=100               // Size of batch for bulk indexing
     bulk.insert=enabled         // enabled or disabled. Default is 'disabled'
