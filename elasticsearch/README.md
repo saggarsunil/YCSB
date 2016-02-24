@@ -53,6 +53,22 @@ The default setting for the ElasticSearch node that is created is as follows:
     index.number_of_replicas=0
     es.index.key=es.ycsb
 
+	
+### Client Configuration and Bulk Indexing
+
+	A client can connect to ElasticSearch cluster in multiple ways:
+	1. Node Client: When a client runs as 'Node Client', it becomes part of
+	ES cluster(node.local=true)
+	2. Transport Client: When a client runs as 'Transport Client', it connects
+	to ES cluster remotely(node.local=false)
+	
+	Bulk Indexing allows you to do multiple inserts in a single step. 
+	The following configuration parameters can be used to enabled bulk indexing in ES.
+	
+	bulk.size=100               // Size of batch for bulk indexing
+    bulk.insert=enabled         // enabled or disabled. Default is 'disabled'
+
+
 ### Custom Configuration
 If you wish to customize the settings used to create the ElasticSerach node
 you can created a new property file that contains your desired ElasticSearch 

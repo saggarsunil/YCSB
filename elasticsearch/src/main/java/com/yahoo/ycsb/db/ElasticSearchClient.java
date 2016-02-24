@@ -42,6 +42,15 @@ import org.elasticsearch.index.query.RangeQueryBuilder;
 import org.elasticsearch.node.Node;
 import org.elasticsearch.search.SearchHit;
 
+/* Adding bulk API support */
+import org.elasticsearch.action.bulk.BulkProcessor;
+import org.elasticsearch.common.unit.ByteSizeUnit;
+import org.elasticsearch.common.unit.ByteSizeValue;
+import org.elasticsearch.common.unit.TimeValue;
+import org.elasticsearch.action.bulk.BulkRequest;
+import org.elasticsearch.action.bulk.BulkResponse;
+import org.elasticsearch.action.index.IndexRequest;
+
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.HashMap;
@@ -70,10 +79,16 @@ public class ElasticSearchClient extends DB {
   public static final String DEFAULT_CLUSTER_NAME = "es.ycsb.cluster";
   public static final String DEFAULT_INDEX_KEY = "es.ycsb";
   public static final String DEFAULT_REMOTE_HOST = "localhost:9300";
+  public static final String DEFAULT_BULK_SIZE = "1000";
+  public static final String DEFAULT_BULK_INSERT = "disabled";
+  
   private Node node;
   private Client client;
   private String indexKey;
   private Boolean remoteMode;
+  private BulkProcessor bulkProcessor;
+  private String bulkInsert;
+	
 
   /**
    * Initialize any state for this DB. Called once per DB instance; there is one
@@ -81,12 +96,29 @@ public class ElasticSearchClient extends DB {
    */
   @Override
   public void init() throws DBException {
+    
+    /* Read the properties file */
     Properties props = getProperties();
+    
+    /* Default index name */
     this.indexKey = props.getProperty("es.index.key", DEFAULT_INDEX_KEY);
+
+    /* Default cluster name */
     String clusterName =
         props.getProperty("cluster.name", DEFAULT_CLUSTER_NAME);
-    // Check if transport client needs to be used (To connect to multiple
-    // elasticsearch nodes)
+		
+	/* Check if the bulk indexing is enabled and size of each bulk */
+    String bulkSize = props.getProperty("bulk.size", DEFAULT_BULK_SIZE);
+    bulkInsert = props.getProperty("bulk.insert", DEFAULT_BULK_INSERT);
+
+    /* 
+	 * There are 2 ways to connect to ES cluster:
+     * 1. Node Client: Client node becomes part of the ES cluster
+     * 2. Transport client: Client connects to ES cluster remotely.
+     * 
+     * Using 'elasticsearch.remote' as 'false' for default setting.
+     * So, default is 'Node Client'
+		*/
     remoteMode = Boolean
         .parseBoolean(props.getProperty("elasticsearch.remote", "false"));
     Boolean newdb =
@@ -158,6 +190,39 @@ public class ElasticSearchClient extends DB {
         client.admin().indices().prepareCreate(indexKey).execute().actionGet();
       }
     }
+	
+	/* Iniitialize a bulk Processor here */
+    bulkProcessor = BulkProcessor.builder( client, new BulkProcessor.Listener() {
+        @Override
+        public void beforeBulk(long executionId,
+                BulkRequest request) { /* System.out.println("before Bulk");*/ } 
+        @Override
+        public void afterBulk(long executionId,
+                                  BulkRequest request,
+                                  BulkResponse response) 
+        { 
+           /* System.out.println(" has Failures : "+response.hasFailures());
+		   if ( response.hasFailures() )
+           {
+               System.out.println("response failed."); 
+		       System.out.println("Message: "+response.buildFailureMessage() );
+           } */
+        } 
+
+        @Override
+        public void afterBulk(long executionId,
+                                  BulkRequest request,
+                                  Throwable failure) 
+        {
+               System.out.println("BULK FAILED: Execution ID: "+executionId);
+               System.out.println("Error Message: "+failure.getMessage());
+        } 
+        })
+    .setBulkActions(Integer.parseInt(bulkSize)) 
+    .setBulkSize(new ByteSizeValue(1, ByteSizeUnit.GB)) 
+    .setFlushInterval(TimeValue.timeValueSeconds(5)) 
+    .setConcurrentRequests(1) 
+    .build();
   }
 
   @Override
@@ -198,14 +263,16 @@ public class ElasticSearchClient extends DB {
       }
 
       doc.endObject();
-
-      client.prepareIndex(indexKey, table, key).setSource(doc).execute()
+      if ( bulkInsert.matches("enabled"))
+	     bulkProcessor.add( new IndexRequest(indexKey, table, key).source(doc)); 
+      else {
+         client.prepareIndex(indexKey, table, key).setSource(doc).execute()
           .actionGet();
-
+      }
       return Status.OK;
     } catch (Exception e) {
       e.printStackTrace();
-    }
+      }
     return Status.ERROR;
   }
 
